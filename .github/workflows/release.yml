@@ -1,0 +1,91 @@
+# Builds the add-on for a GitHub release and attaches the files users can install:
+# - faster_pageload-<version>.zip: unsigned build, for about:debugging (temporary install)
+# - *.xpi: signed by Mozilla (unlisted channel), installs permanently in regular Firefox
+#
+# Signing needs the repository secrets AMO_API_KEY (JWT issuer) and AMO_API_SECRET (JWT secret)
+# from addons.mozilla.org → Developer Hub → Tools → Manage API Keys. Without them, only the zip
+# is attached.
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to build and attach files to (e.g. v2.0.0)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      HAS_AMO_KEYS: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Check the tag matches manifest.json
+        run: |
+          version=$(node -p "require('./manifest.json').version")
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match manifest.json version $version (expected v$version)"
+            exit 1
+          fi
+
+      - run: pnpm test
+      - run: pnpm lint
+      - run: pnpm build
+
+      # AMO signs each version only once. If this version was already signed (e.g. manually),
+      # signing fails; the zip is still attached and a warning explains why.
+      - name: Sign with Mozilla (unlisted)
+        id: sign
+        if: env.HAS_AMO_KEYS == 'true'
+        continue-on-error: true
+        env:
+          WEB_EXT_API_KEY: ${{ secrets.AMO_API_KEY }}
+          WEB_EXT_API_SECRET: ${{ secrets.AMO_API_SECRET }}
+        run: pnpm exec web-ext sign --channel=unlisted --approval-timeout 1800000
+
+      - name: Report signing problems
+        if: env.HAS_AMO_KEYS != 'true' || steps.sign.outcome == 'failure'
+        run: |
+          if [ "$HAS_AMO_KEYS" != "true" ]; then
+            echo "::warning::AMO_API_KEY/AMO_API_SECRET secrets are not set; attaching the unsigned zip only."
+          else
+            echo "::warning::Signing failed (see the 'Sign with Mozilla' step). If this version was already signed on AMO, download the .xpi from the Developer Hub and attach it with: gh release upload $TAG <file>.xpi"
+          fi
+
+      - name: Attach files to the release
+        run: |
+          shopt -s nullglob
+          files=(web-ext-artifacts/*.zip web-ext-artifacts/*.xpi)
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "::error::No build output found in web-ext-artifacts/"
+            exit 1
+          fi
+          gh release upload "$TAG" "${files[@]}" --clobber
+          printf 'Attached to %s:\n' "$TAG"
+          printf '  %s\n' "${files[@]}"

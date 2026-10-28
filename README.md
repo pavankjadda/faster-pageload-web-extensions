@@ -28,9 +28,12 @@ Pages still load normally. The add-on just starts the download a little earlier,
 
 ## Installation
 
-### From addons.mozilla.org
+### From GitHub Releases
 
-Search for **Faster Pageload** on [addons.mozilla.org](https://addons.mozilla.org/firefox/) and click **Add to Firefox**. A setup page opens after installation.
+1. Open the [latest release](https://github.com/pavankjadda/faster-pageload-web-extensions/releases/latest) and download the `.xpi` file. It is signed by Mozilla.
+2. In Firefox, open `about:addons`, click the gear icon → **Install Add-on From File…** and choose the downloaded `.xpi`.
+
+A setup page opens after installation. The add-on is not listed on addons.mozilla.org, so Firefox won't update it automatically: install a newer `.xpi` from Releases to update.
 
 ### From source, temporarily
 
@@ -175,9 +178,17 @@ test/                 Unit tests
 
 ### Releasing
 
-1. Bump `version` in both `manifest.json` and `package.json`.
-2. Add an entry to `CHANGELOG.md`.
-3. Run `pnpm package` and upload the zip from `web-ext-artifacts/` to addons.mozilla.org.
+1. Bump `version` in both `manifest.json` and `package.json`. AMO signs each version only once.
+2. Add an entry to `CHANGELOG.md`, commit and push.
+3. Publish a GitHub release with the tag `v<version>` (for example `v2.1.0`).
+
+The [Release workflow](.github/workflows/release.yml) then tests and lints the add-on, builds the zip, has Mozilla sign it (unlisted, so it is not public on addons.mozilla.org) and attaches the zip and the signed `.xpi` to the release. It fails if the tag doesn't match the version in `manifest.json`.
+
+One-time setup: add the AMO API credentials (addons.mozilla.org → Developer Hub → Tools → Manage API Keys) as the repository secrets `AMO_API_KEY` (JWT issuer) and `AMO_API_SECRET` (JWT secret). Without them the workflow attaches only the unsigned zip.
+
+To sign locally instead, put `WEB_EXT_API_KEY` and `WEB_EXT_API_SECRET` in `.env.local` (git-ignored) and run `pnpm sign`.
+
+To rebuild the files for an existing release, run the workflow manually from the **Actions** tab and enter the tag.
 
 ## Credits
 
