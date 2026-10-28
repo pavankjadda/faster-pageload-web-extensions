@@ -1,11 +1,11 @@
-.PHONY: store 
+.PHONY: store clean test
 
+# Thin wrapper around the pnpm scripts in package.json.
 store:
-	@echo "Building..."
-	@zip faster_pageload.zip * -r
-	@echo "Build completed."
+	@pnpm package
+
+test:
+	@pnpm test
 
 clean:
-	@echo "Started cleaning...."
-	@rm faster_pageload.zip 
-	@echo "Finished cleaning"
+	@rm -rf web-ext-artifacts faster_pageload.zip

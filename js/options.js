@@ -1,38 +1,72 @@
-var preloadViewportElement = document.getElementById("preloadViewport");
-var imgLazyLoadElement = document.getElementById("imgLazyLoad");
-var blacklistSitesElement = document.getElementById("blacklistSites");
+"use strict";
 
-function saveOptions(e) {
-    e.preventDefault();
-    browser.storage.sync.set({
-        preloadViewport: preloadViewportElement.checked,
-        imgLazyLoad: imgLazyLoadElement.checked,
-        blacklistSites: blacklistSitesElement.value.replace(/\s+/g, '').toLowerCase(),
-    });
+const preloadViewportElement = document.getElementById("preloadViewport");
+const imgLazyLoadElement = document.getElementById("imgLazyLoad");
+const blacklistSitesElement = document.getElementById("blacklistSites");
+const statusElement = document.getElementById("status");
 
-    browser.runtime.reload();
+// Must stay in sync with BLACKLIST_HOST in background.js.
+const BLACKLIST_HOST = /^(\*\.)?[a-z0-9_-]+(\.[a-z0-9_-]+)*$/;
+
+// Accepts "example.com", "*.example.com" or a pasted URL such as "https://example.com:8080/path"
+// and reduces it to the host. Ports are dropped because match patterns cannot express them.
+function normalizeHost(entry) {
+  const wildcard = entry.startsWith("*.") ? "*." : "";
+  const rest = wildcard ? entry.slice(2) : entry;
+  try {
+    const { hostname } = new URL(rest.includes("://") ? rest : `http://${rest}`);
+    const host = wildcard + hostname;
+    return BLACKLIST_HOST.test(host) ? host : null;
+  } catch {
+    return null;
+  }
 }
 
-function restoreOptions() {
-    function setPreloadViewport(result) {
-        preloadViewportElement.checked = result.preloadViewport || false;     
+function parseBlacklist(value) {
+  const hosts = [];
+  const invalid = [];
+  for (const entry of value.split(",").map((part) => part.trim().toLowerCase()).filter(Boolean)) {
+    const host = normalizeHost(entry);
+    if (host) {
+      if (!hosts.includes(host)) hosts.push(host);
+    } else {
+      invalid.push(entry);
     }
-    function setImgLazyLoad(result) {
-        imgLazyLoadElement.checked = result.imgLazyLoad || false;
-    }
-    function setBlacklistSites(result) {
-        blacklistSitesElement.value = result.blacklistSites || "";
-    }
+  }
+  return { hosts, invalid };
+}
 
-    function onError(error) {
-        alert(`[faster pageload plugin] local storage error: ${error}`);
-    }
-    
+async function saveOptions(event) {
+  event.preventDefault();
+  const { hosts, invalid } = parseBlacklist(blacklistSitesElement.value);
+  if (invalid.length > 0) {
+    statusElement.textContent = `Not saved. Invalid blacklist entries: ${invalid.join(", ")}`;
+    return;
+  }
+  const blacklistSites = hosts.join(",");
+  try {
+    // The background script picks the change up via storage.onChanged; no reload needed.
+    await browser.storage.sync.set({
+      preloadViewport: preloadViewportElement.checked,
+      imgLazyLoad: imgLazyLoadElement.checked,
+      blacklistSites,
+    });
+    blacklistSitesElement.value = blacklistSites;
+    statusElement.textContent = "Saved. Applies to pages loaded from now on.";
+  } catch (error) {
+    statusElement.textContent = `Could not save settings: ${error}`;
+  }
+}
 
-    browser.storage.sync.get("preloadViewport").then(setPreloadViewport, onError);
-    browser.storage.sync.get("imgLazyLoad").then(setImgLazyLoad, onError);
-    browser.storage.sync.get("blacklistSites").then(setBlacklistSites, onError);
-    
+async function restoreOptions() {
+  try {
+    const settings = await browser.storage.sync.get(["preloadViewport", "imgLazyLoad", "blacklistSites"]);
+    preloadViewportElement.checked = settings.preloadViewport === true;
+    imgLazyLoadElement.checked = settings.imgLazyLoad === true;
+    blacklistSitesElement.value = settings.blacklistSites || "";
+  } catch (error) {
+    statusElement.textContent = `Could not load settings: ${error}`;
+  }
 }
 
 document.addEventListener("DOMContentLoaded", restoreOptions);

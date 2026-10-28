@@ -1,13 +1,13 @@
 {
   "manifest_version": 2,
   "name": "Faster Pageload",
-  "version": "1.8.5",
+  "version": "1.9.0",
   "author": "Simon Frey",
   "developer": {
     "name": "Simon Frey",
     "url": "https://simon-frey.eu/"
   },
-  "description": "Load webpages faster by preloading subsequent pages via the instant.page script. Install the plugin and you will feel how your browser becomes faster.",
+  "description": "Load webpages faster by preloading the pages you are about to open. Install the plugin and you will feel how your browser becomes faster.",
   "homepage_url": "https://github.com/simonfrey/faster-pageload-web-extensions",
 
   "icons": {
@@ -23,24 +23,18 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "{73c0257e-a620-4c48-a2a8-2a9e8481a0d4}"
+      "id": "{73c0257e-a620-4c48-a2a8-2a9e8481a0d4}",
+      "strict_min_version": "91.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
     }
   },
 
-  "web_accessible_resources": ["static/*"],
   "browser_action": {
-    "default_icon":  "icons/rocket.svg",
+    "default_icon": "icons/rocket.svg",
     "default_title": "Faster Pageload"
   },
 
-  "permissions": ["storage",
-    "webRequest",
-    "<all_urls>",
-  "webRequestBlocking"],
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["js/instant_page.min.js", "js/lazy_images.js"]
-    }
-  ]
+  "permissions": ["storage", "<all_urls>"]
 }

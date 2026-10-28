@@ -1,0 +1,28 @@
+{
+  "name": "faster-pageload",
+  "private": true,
+  "version": "1.9.0",
+  "description": "Firefox add-on that preloads the pages you are about to open so they appear instantly.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pavankjadda/faster-pageload-web-extensions.git"
+  },
+  "bugs": {
+    "url": "https://github.com/pavankjadda/faster-pageload-web-extensions/issues"
+  },
+  "homepage": "https://github.com/pavankjadda/faster-pageload-web-extensions#readme",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/",
+    "lint": "web-ext lint",
+    "start": "web-ext run",
+    "build": "web-ext build --overwrite-dest",
+    "package": "pnpm test && pnpm lint && pnpm build"
+  },
+  "packageManager": "pnpm@12.15.0",
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "web-ext": "^8.10.0"
+  }
+}
