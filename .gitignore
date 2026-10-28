@@ -3,3 +3,4 @@ web-ext-artifacts/
 .claude
 node_modules/
 .env.local
+.amo-upload-uuid

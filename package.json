@@ -18,7 +18,8 @@
     "lint": "web-ext lint",
     "start": "web-ext run",
     "build": "web-ext build --overwrite-dest",
-    "package": "pnpm test && pnpm lint && pnpm build"
+    "package": "pnpm test && pnpm lint && pnpm build",
+    "sign": "pnpm test && pnpm lint && node --env-file=.env.local node_modules/web-ext/bin/web-ext.js sign --channel=unlisted"
   },
   "engines": {
     "node": ">=24"
