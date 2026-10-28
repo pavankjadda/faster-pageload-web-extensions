@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.9.0
+## 2.0.0
 
 - Fixed: links are now preloaded on most sites. The bundled instant.page script only preloaded same-origin links without query strings, so most links were skipped. It has been replaced by a built-in preloader that also handles query strings and skips links that look like actions (logout, delete, vote, like, follow, mark-as-read, add-to-cart, …).
 - Fixed: "Preload every visible link" now works. The option was saved but never read. It is off by default, because prefetching without any user signal can trigger links that perform actions. When on, it preloads up to 30 visible links per page, including links added after the page loads, and skips links with query strings, links marked `rel="ugc"`/`nofollow`, and links in comment sections.
