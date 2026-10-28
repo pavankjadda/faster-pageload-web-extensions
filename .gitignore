@@ -2,3 +2,4 @@ faster_pageload.zip
 web-ext-artifacts/
 .claude
 node_modules/
+.env.local
