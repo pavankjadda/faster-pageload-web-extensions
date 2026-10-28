@@ -1,9 +1,14 @@
 "use strict";
 
 // Prefetches same-origin pages the user is about to open: on hover/touch, and links that scroll
-// into view while "Preload every visible link" is enabled (the default).
+// into view while "Preload every visible link" is enabled (off by default).
 // Approach based on instant.page by Alexandre Dieulot (https://instant.page/).
 (() => {
+  // A page can receive this script twice while the background script swaps registrations.
+  // The flag lives in the extension's content-script scope, not on the page.
+  if (globalThis.fasterPageloadPreloadLoaded) return;
+  globalThis.fasterPageloadPreloadLoaded = true;
+
   const HOVER_DELAY_MS = 65;
   // Touch devices fire a synthetic mouseover after touchstart; ignore it.
   const TOUCH_MOUSEOVER_GAP_MS = 1111;
@@ -102,9 +107,12 @@
       // Same function reference each time, so repeated hovers don't stack listeners.
       anchor.addEventListener("mouseout", cancelHover, { passive: true });
       clearTimeout(hoverTimer);
+      // Fetch exactly the URL that was validated, and only if the link still points there: a menu
+      // or SPA (or a <base href> change) may retarget the link during the delay.
+      const url = anchor.href;
       hoverTimer = setTimeout(() => {
-        prefetch(anchor.href);
         hoverTimer = undefined;
+        if (anchor.isConnected && anchor.href === url && isPreloadable(anchor)) prefetch(url);
       }, HOVER_DELAY_MS);
     },
     listenerOptions
@@ -122,11 +130,13 @@
 
   function preloadVisibleLinks() {
     if (navigator.connection?.saveData) return;
+    let domObserver;
     const observer = new IntersectionObserver((entries) => {
       for (const entry of entries) {
         if (!entry.isIntersecting) continue;
         if (preloaded.size >= MAX_VIEWPORT_PRELOADS) {
           observer.disconnect();
+          domObserver.disconnect();
           return;
         }
         observer.unobserve(entry.target);
@@ -134,15 +144,30 @@
         if (isViewportPreloadable(entry.target)) prefetch(entry.target.href);
       }
     });
-    for (const anchor of document.querySelectorAll("a[href]")) {
-      if (isViewportPreloadable(anchor)) observer.observe(anchor);
+
+    function watchLinksIn(root) {
+      const anchors = root.matches?.("a[href]") ? [root] : root.querySelectorAll("a[href]");
+      for (const anchor of anchors) {
+        if (isViewportPreloadable(anchor)) observer.observe(anchor);
+      }
     }
+
+    // Single-page apps often render their links after load; pick those up too.
+    domObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) watchLinksIn(node);
+        }
+      }
+    });
+    domObserver.observe(document.body, { childList: true, subtree: true });
+    watchLinksIn(document);
   }
 
   browser.storage.sync.get("preloadViewport").then(
     ({ preloadViewport }) => {
-      // On unless the user switched it off; older installs may have stored false explicitly.
-      if (preloadViewport === false) return;
+      // Opt-in: prefetching without any user signal can trigger GET links with side effects.
+      if (preloadViewport !== true) return;
       const whenIdle = window.requestIdleCallback
         ? (callback) => requestIdleCallback(callback, { timeout: 1500 })
         : (callback) => setTimeout(callback, 0);

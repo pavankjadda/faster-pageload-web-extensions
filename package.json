@@ -14,13 +14,15 @@
   "homepage": "https://github.com/pavankjadda/faster-pageload-web-extensions#readme",
   "type": "module",
   "scripts": {
-    "test": "node --test test/",
+    "test": "node --test \"test/*.test.mjs\"",
     "lint": "web-ext lint",
     "start": "web-ext run",
     "build": "web-ext build --overwrite-dest",
     "package": "pnpm test && pnpm lint && pnpm build"
   },
-  "packageManager": "pnpm@12.15.0",
+  "engines": {
+    "node": ">=24"
+  },
   "devDependencies": {
     "jsdom": "^26.1.0",
     "web-ext": "^8.10.0"

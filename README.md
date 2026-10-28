@@ -21,7 +21,7 @@ Pages still load normally. The add-on just starts the download a little earlier,
 | Feature | Default | What it does |
 |---|---|---|
 | Preload on hover | On | Prefetches a link 65 ms after the pointer rests on it. Also prefetches on touch (mobile) and on mouse down. |
-| Preload every visible link | On | Also prefetches links as they scroll into view, up to 30 per page. Uses stricter rules than hover (see [What is not preloaded](#what-is-not-preloaded)). |
+| Preload every visible link | Off | Also prefetches links as they scroll into view (including links the page adds later), up to 30 per page. Uses stricter rules than hover (see [What is not preloaded](#what-is-not-preloaded)). |
 | Lazy-load images | Off | Marks images with `loading="lazy"` so off-screen images load only when you scroll near them. |
 | Site blacklist | Empty | Turns the add-on off completely on the listed sites. |
 | Toolbar switch | On | Clicking the rocket icon turns the add-on on or off everywhere. A grey rocket means it is off. |
@@ -48,7 +48,7 @@ Firefox 91 or newer is required.
 
 Open the settings from `about:addons` → **Faster Pageload** → **Preferences**.
 
-- **Preload every visible link.** On by default. It costs more bandwidth and puts more load on the sites you visit, so turn it off on metered connections. It is skipped automatically when the browser reports data-saver mode.
+- **Preload every visible link.** Off by default. It fetches pages you never pointed at, which costs bandwidth, puts load on the sites you visit, and can trigger links that perform an action on sites that use plain links for actions (the skip rules below reduce but cannot remove that risk). Turn it on only if you accept that. It is skipped automatically when the browser reports data-saver mode.
 - **Lazyload images.** Saves bandwidth on long, image-heavy pages. Images that already set their own `loading` attribute are left alone.
 - **Blacklist sites.** A comma-separated list of sites where the add-on should do nothing.
   - `www.example.com` matches exactly that host.
@@ -128,14 +128,14 @@ When **Preload every visible link** prefetches a link you didn't hover over, it 
 - Prefetching means a site can see requests for pages you hovered over but never opened. If that matters for a site, add it to the blacklist.
 - Permissions:
   - `storage`, to save settings.
-  - `<all_urls>`, so the preloader can run on the pages you visit.
+  - `http://*/*` and `https://*/*`, so the preloader can run on the web pages you visit.
 
 ## Development
 
 ### Requirements
 
-- Node.js 22 or newer.
-- [pnpm](https://pnpm.io/). The version is pinned in `package.json` → `packageManager`.
+- Node.js 24 or newer.
+- [pnpm](https://pnpm.io/).
 - Firefox, for `pnpm start`.
 
 ### Commands

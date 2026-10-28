@@ -3,7 +3,7 @@
 const DEFAULT_SETTINGS = {
   active: true,
   imgLazyLoad: false,
-  preloadViewport: true,
+  preloadViewport: false,
   blacklistSites: "",
 };
 
@@ -11,7 +11,13 @@ const DEFAULT_SETTINGS = {
 // options.js validates with the same pattern; this is the safety net for older stored values.
 const BLACKLIST_HOST = /^(\*\.)?[a-z0-9_-]+(\.[a-z0-9_-]+)*$/;
 
+// Only web pages; the preloader has nothing to do on file:, ftp: or other schemes.
+const WEB_PAGES = ["http://*/*", "https://*/*"];
+
 let registeredScripts = [];
+// Identifies the configuration behind registeredScripts, so unrelated setting changes
+// (e.g. preloadViewport, which preload.js reads itself) don't trigger a re-registration.
+let registeredConfig = null;
 let applyQueue = Promise.resolve();
 
 async function getSettings() {
@@ -41,13 +47,16 @@ function updateBrowserAction(active) {
 // The new set is registered before the old one is removed, so pages never load without scripts,
 // and a failed registration leaves the previous set in place.
 async function registerContentScripts(settings) {
+  const excludeMatches = toExcludeMatches(settings.blacklistSites);
+  const config = JSON.stringify({ active: settings.active, imgLazyLoad: settings.imgLazyLoad, excludeMatches });
+  if (config === registeredConfig) return;
+
   const previous = registeredScripts;
   const next = [];
 
   try {
     if (settings.active) {
-      const target = { matches: ["<all_urls>"] };
-      const excludeMatches = toExcludeMatches(settings.blacklistSites);
+      const target = { matches: WEB_PAGES };
       if (excludeMatches.length > 0) target.excludeMatches = excludeMatches;
 
       next.push(
@@ -74,6 +83,7 @@ async function registerContentScripts(settings) {
   }
 
   registeredScripts = next;
+  registeredConfig = config;
   await Promise.allSettled(previous.map((script) => script.unregister()));
 }
 

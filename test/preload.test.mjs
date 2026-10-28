@@ -125,14 +125,50 @@ test("viewport mode prefetches visible links, re-checks them and stops at the ca
   assert.ok(observers[0].disconnected);
 });
 
-test("viewport mode is on by default", async () => {
+test("viewport mode is off by default", async () => {
   const { observed } = runContentScript("preload.js", { html: PAGE, storage: {} });
   await sleep(50);
-  assert.equal(observed.length, 2);
+  assert.equal(observed.length, 0);
 });
 
-test("viewport mode stays off when switched off", async () => {
-  const { observed } = runContentScript("preload.js", { html: PAGE, storage: { preloadViewport: false } });
+test("a link retargeted during the hover delay is not prefetched", async () => {
+  const { window, document } = runContentScript("preload.js", { html: PAGE });
+  const link = document.getElementById("plain");
+  hover(window, link);
+  link.href = "/account/logout";
+  await sleep(100);
+  assert.deepEqual(prefetchedUrls(document), []);
+});
+
+test("a link removed during the hover delay is not prefetched", async () => {
+  const { window, document } = runContentScript("preload.js", { html: PAGE });
+  const link = document.getElementById("plain");
+  hover(window, link);
+  link.remove();
+  await sleep(100);
+  assert.deepEqual(prefetchedUrls(document), []);
+});
+
+test("a second injection into the same page is ignored", async () => {
+  const { window, document, inject } = runContentScript("preload.js", { html: PAGE });
+  inject();
+  document.getElementById("plain").dispatchEvent(new window.MouseEvent("mousedown", { bubbles: true, button: 0 }));
+  assert.equal(document.querySelectorAll('link[rel="prefetch"]').length, 1);
+});
+
+test("viewport mode picks up links added after load", async () => {
+  const { document, observed } = runContentScript("preload.js", { html: "<body></body>", storage: { preloadViewport: true } });
   await sleep(50);
-  assert.equal(observed.length, 0);
+  const list = document.createElement("ul");
+  list.innerHTML = '<li><a id="late" href="/late">late</a></li><li><a id="late-q" href="/late?x=1">q</a></li>';
+  document.body.append(list);
+  const direct = document.createElement("a");
+  direct.id = "late-direct";
+  direct.href = "/late-direct";
+  document.body.append(direct);
+  await sleep(0);
+  assert.deepEqual(
+    observed.map((anchor) => anchor.id),
+    ["late", "late-direct"]
+  );
 });

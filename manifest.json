@@ -36,5 +36,5 @@
     "default_title": "Faster Pageload"
   },
 
-  "permissions": ["storage", "<all_urls>"]
+  "permissions": ["storage", "http://*/*", "https://*/*"]
 }

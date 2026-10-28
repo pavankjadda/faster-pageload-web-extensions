@@ -10,6 +10,7 @@ async function loadBackground(stored, { failLazyRegistration = false } = {}) {
   const listeners = { clicked: [], changed: [] };
   const icons = [];
   const fail = { lazyRegistration: failLazyRegistration };
+  const registerAttempts = [];
 
   const browser = {
     storage: {
@@ -29,6 +30,7 @@ async function loadBackground(stored, { failLazyRegistration = false } = {}) {
     },
     contentScripts: {
       register: async (options) => {
+        registerAttempts.push(options.js[0].file);
         if (fail.lazyRegistration && options.js[0].file === "js/lazy_images.js") throw new Error("register failed");
         const registration = { options, active: true, unregister: async () => (registration.active = false) };
         registered.push(registration);
@@ -55,10 +57,11 @@ async function loadBackground(stored, { failLazyRegistration = false } = {}) {
       .map(({ options }) => ({
         file: options.js[0].file,
         runAt: options.runAt,
+        matches: [...options.matches],
         excludeMatches: options.excludeMatches && [...options.excludeMatches],
       }));
 
-  return { storage, listeners, icons, fail, activeScripts };
+  return { storage, listeners, icons, fail, activeScripts, registered, registerAttempts };
 }
 
 // Lets the storage events and the background's apply queue run to completion.
@@ -66,7 +69,9 @@ const settle = () => sleep(20);
 
 test("defaults register only the preloader", async () => {
   const { activeScripts, icons } = await loadBackground({});
-  assert.deepEqual(activeScripts(), [{ file: "js/preload.js", runAt: "document_idle", excludeMatches: undefined }]);
+  assert.deepEqual(activeScripts(), [
+    { file: "js/preload.js", runAt: "document_idle", matches: ["http://*/*", "https://*/*"], excludeMatches: undefined },
+  ]);
   assert.equal(icons.at(-1), "icons/rocket.svg");
 });
 
@@ -116,13 +121,28 @@ test("a fast double click toggles twice", async () => {
   assert.equal(activeScripts().length, 1);
 });
 
-test("a failed registration keeps the previous scripts", async () => {
-  const { activeScripts, fail, listeners } = await loadBackground({});
+test("a failed registration keeps the previous scripts and rolls back the partial new set", async () => {
+  const { storage, fail, listeners, registered, registerAttempts, activeScripts } = await loadBackground({});
+  const original = registered[0];
   fail.lazyRegistration = true;
-  listeners.changed.forEach((listener) => listener({ imgLazyLoad: { newValue: true } }, "sync"));
+  storage.imgLazyLoad = true;
+  listeners.changed.forEach((listener) => listener({ imgLazyLoad: { oldValue: undefined, newValue: true } }, "sync"));
   await settle();
+
+  assert.deepEqual(registerAttempts, ["js/preload.js", "js/preload.js", "js/lazy_images.js"]);
+  assert.equal(original.active, true, "the original registration must survive");
+  assert.equal(registered[1].active, false, "the partial replacement must be unregistered");
   assert.deepEqual(
     activeScripts().map(({ file }) => file),
     ["js/preload.js"]
   );
+});
+
+test("changes that don't affect registration don't re-register", async () => {
+  const { storage, listeners, registerAttempts, registered } = await loadBackground({});
+  storage.preloadViewport = true;
+  listeners.changed.forEach((listener) => listener({ preloadViewport: { oldValue: undefined, newValue: true } }, "sync"));
+  await settle();
+  assert.deepEqual(registerAttempts, ["js/preload.js"]);
+  assert.equal(registered[0].active, true);
 });

@@ -31,8 +31,9 @@ export function runContentScript(name, { html, url = "https://shop.example.test/
   };
   window.browser = { storage: { sync: { get: async () => ({ ...storage }) } } };
 
-  window.eval(readScript(name));
-  return { window, document: window.document, observed, observers };
+  const inject = () => window.eval(readScript(name));
+  inject();
+  return { window, document: window.document, observed, observers, inject };
 }
 
 export function prefetchedUrls(document) {

@@ -4,6 +4,10 @@
 // so off-screen images are only fetched when they are about to scroll into view.
 // Images that already have a loading attribute (e.g. loading="eager") are left untouched.
 (() => {
+  // See preload.js: guards against double injection while registrations are swapped.
+  if (globalThis.fasterPageloadLazyImagesLoaded) return;
+  globalThis.fasterPageloadLazyImagesLoaded = true;
+
   function makeLazy(img) {
     if (!img.hasAttribute("loading")) img.setAttribute("loading", "lazy");
   }
