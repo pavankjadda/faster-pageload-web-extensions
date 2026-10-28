@@ -1,6 +1,9 @@
 # Builds the add-on for a GitHub release and attaches the files users can install:
-# - faster_pageload-<version>.zip: unsigned build, for about:debugging (temporary install)
-# - *.xpi: signed by Mozilla (unlisted channel), installs permanently in regular Firefox
+# - faster_pageload-<version>.zip: unsigned build, attached as soon as tests pass. Loads temporarily
+#   via about:debugging, or permanently in Firefox Developer Edition/Nightly/ESR with
+#   xpinstall.signatures.required = false.
+# - *.xpi: signed by Mozilla (unlisted channel), attached by a separate job once AMO has signed it
+#   (usually a few minutes). The only file regular Firefox installs permanently.
 #
 # Signing needs the repository secrets AMO_API_KEY (JWT issuer) and AMO_API_SECRET (JWT secret)
 # from addons.mozilla.org → Developer Hub → Tools → Manage API Keys. Without them, only the zip
@@ -23,12 +26,13 @@ concurrency:
   group: release-${{ github.event.release.tag_name || inputs.tag }}
   cancel-in-progress: false
 
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
 jobs:
   build:
+    name: Test, build and attach zip
     runs-on: ubuntu-latest
-    env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag }}
-      HAS_AMO_KEYS: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -58,36 +62,56 @@ jobs:
       - run: pnpm lint
       - run: pnpm build
 
-      # AMO signs each version only once. If this version was already signed (e.g. manually),
-      # signing fails; the zip is still attached and a warning explains why.
-      - name: Sign with Mozilla (unlisted)
-        id: sign
+      - name: Attach zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" web-ext-artifacts/*.zip --clobber
+
+  sign:
+    name: Sign with Mozilla and attach xpi
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      HAS_AMO_KEYS: ${{ secrets.AMO_API_KEY != '' && secrets.AMO_API_SECRET != '' }}
+    steps:
+      - name: Skip without AMO credentials
+        if: env.HAS_AMO_KEYS != 'true'
+        run: echo "::warning::AMO_API_KEY/AMO_API_SECRET secrets are not set; only the unsigned zip was attached."
+
+      - uses: actions/checkout@v7
         if: env.HAS_AMO_KEYS == 'true'
-        continue-on-error: true
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: env.HAS_AMO_KEYS == 'true'
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v7
+        if: env.HAS_AMO_KEYS == 'true'
+        with:
+          node-version: lts/*
+          cache: pnpm
+
+      - if: env.HAS_AMO_KEYS == 'true'
+        run: pnpm install --frozen-lockfile
+
+      # AMO signs each version only once. If this version was already submitted (e.g. manually),
+      # this fails; the zip is already attached, and the error explains how to add the .xpi.
+      - name: Sign (unlisted)
+        if: env.HAS_AMO_KEYS == 'true'
         env:
           WEB_EXT_API_KEY: ${{ secrets.AMO_API_KEY }}
           WEB_EXT_API_SECRET: ${{ secrets.AMO_API_SECRET }}
-        run: pnpm exec web-ext sign --channel=unlisted --approval-timeout 1800000
-
-      - name: Report signing problems
-        if: env.HAS_AMO_KEYS != 'true' || steps.sign.outcome == 'failure'
         run: |
-          if [ "$HAS_AMO_KEYS" != "true" ]; then
-            echo "::warning::AMO_API_KEY/AMO_API_SECRET secrets are not set; attaching the unsigned zip only."
-          else
-            echo "::warning::Signing failed (see the 'Sign with Mozilla' step). If this version was already signed on AMO, download the .xpi from the Developer Hub and attach it with: gh release upload $TAG <file>.xpi"
-          fi
-
-      - name: Attach files to the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          shopt -s nullglob
-          files=(web-ext-artifacts/*.zip web-ext-artifacts/*.xpi)
-          if [ ${#files[@]} -eq 0 ]; then
-            echo "::error::No build output found in web-ext-artifacts/"
+          if ! pnpm exec web-ext sign --channel=unlisted --approval-timeout 3600000; then
+            echo "::error::Signing failed. If $TAG was already submitted to AMO, download the signed .xpi from the Developer Hub and attach it with: gh release upload $TAG <file>.xpi"
             exit 1
           fi
-          gh release upload "$TAG" "${files[@]}" --clobber
-          printf 'Attached to %s:\n' "$TAG"
-          printf '  %s\n' "${files[@]}"
+
+      - name: Attach signed xpi to the release
+        if: env.HAS_AMO_KEYS == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" web-ext-artifacts/*.xpi --clobber

@@ -30,7 +30,7 @@ Pages still load normally. The add-on just starts the download a little earlier,
 
 ### From GitHub Releases
 
-1. Open the [latest release](https://github.com/pavankjadda/faster-pageload-web-extensions/releases/latest) and download the `.xpi` file. It is signed by Mozilla.
+1. Open the [latest release](https://github.com/pavankjadda/faster-pageload-web-extensions/releases/latest) and download the `.xpi` file. It is signed by Mozilla. For a release published in the last few minutes, the `.xpi` may not be there yet: it is added once Mozilla has signed it. The `.zip` next to it is unsigned. It works only as a temporary add-on (see below), or in Firefox Developer Edition, Nightly or ESR with `xpinstall.signatures.required` set to `false`.
 2. In Firefox, open `about:addons`, click the gear icon → **Install Add-on From File…** and choose the downloaded `.xpi`.
 
 A setup page opens after installation. The add-on is not listed on addons.mozilla.org, so Firefox won't update it automatically: install a newer `.xpi` from Releases to update.
@@ -182,7 +182,10 @@ test/                 Unit tests
 2. Add an entry to `CHANGELOG.md`, commit and push.
 3. Publish a GitHub release with the tag `v<version>` (for example `v2.1.0`).
 
-The [Release workflow](.github/workflows/release.yml) then tests and lints the add-on, builds the zip, has Mozilla sign it (unlisted, so it is not public on addons.mozilla.org) and attaches the zip and the signed `.xpi` to the release. It fails if the tag doesn't match the version in `manifest.json`.
+The [Release workflow](.github/workflows/release.yml) then runs in two jobs:
+
+1. **Test, build and attach zip:** checks that the tag matches the version in `manifest.json`, runs the tests and lint, and attaches the unsigned zip to the release straight away.
+2. **Sign with Mozilla and attach xpi:** submits the add-on to addons.mozilla.org on the unlisted channel (not public), waits for the signature (usually a few minutes) and attaches the signed `.xpi`.
 
 One-time setup: add the AMO API credentials (addons.mozilla.org → Developer Hub → Tools → Manage API Keys) as the repository secrets `AMO_API_KEY` (JWT issuer) and `AMO_API_SECRET` (JWT secret). Without them the workflow attaches only the unsigned zip.
 
