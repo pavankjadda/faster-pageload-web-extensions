@@ -3,7 +3,7 @@
 const DEFAULT_SETTINGS = {
   active: true,
   imgLazyLoad: false,
-  preloadViewport: false,
+  preloadViewport: true,
   blacklistSites: "",
 };
 

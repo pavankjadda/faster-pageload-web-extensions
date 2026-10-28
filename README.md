@@ -21,7 +21,7 @@ Pages still load normally. The add-on just starts the download a little earlier,
 | Feature | Default | What it does |
 |---|---|---|
 | Preload on hover | On | Prefetches a link 65 ms after the pointer rests on it. Also prefetches on touch (mobile) and on mouse down. |
-| Preload every visible link | Off | Also prefetches links as they scroll into view, up to 30 per page. |
+| Preload every visible link | On | Also prefetches links as they scroll into view, up to 30 per page. |
 | Lazy-load images | Off | Marks images with `loading="lazy"` so off-screen images load only when you scroll near them. |
 | Site blacklist | Empty | Turns the add-on off completely on the listed sites. |
 | Toolbar switch | On | Clicking the rocket icon turns the add-on on or off everywhere. A grey rocket means it is off. |
@@ -48,7 +48,7 @@ Firefox 91 or newer is required.
 
 Open the settings from `about:addons` → **Faster Pageload** → **Preferences**.
 
-- **Preload every visible link.** Useful on fast connections and small pages. It costs more bandwidth and puts more load on the sites you visit, so it is off by default. It is skipped automatically when the browser reports data-saver mode.
+- **Preload every visible link.** On by default. It costs more bandwidth and puts more load on the sites you visit, so turn it off on metered connections. It is skipped automatically when the browser reports data-saver mode.
 - **Lazyload images.** Saves bandwidth on long, image-heavy pages. Images that already set their own `loading` attribute are left alone.
 - **Blacklist sites.** A comma-separated list of sites where the add-on should do nothing.
   - `www.example.com` matches exactly that host.

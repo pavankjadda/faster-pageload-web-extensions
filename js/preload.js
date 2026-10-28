@@ -120,7 +120,8 @@
 
   browser.storage.sync.get("preloadViewport").then(
     ({ preloadViewport }) => {
-      if (!preloadViewport) return;
+      // On unless the user switched it off; older installs may have stored false explicitly.
+      if (preloadViewport === false) return;
       const whenIdle = window.requestIdleCallback
         ? (callback) => requestIdleCallback(callback, { timeout: 1500 })
         : (callback) => setTimeout(callback, 0);

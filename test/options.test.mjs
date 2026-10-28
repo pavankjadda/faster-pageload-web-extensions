@@ -45,3 +45,15 @@ test("invalid entries block saving and are reported", async () => {
   assert.equal(page.storage.blacklistSites, "kept.example.test");
   assert.match(page.document.getElementById("status").textContent, /Invalid blacklist entries: not a host, \*\./);
 });
+
+test("preload every visible link is checked by default and respects a stored false", async () => {
+  const fresh = loadOptionsPage();
+  fresh.window.document.dispatchEvent(new fresh.window.Event("DOMContentLoaded"));
+  await sleep(0);
+  assert.equal(fresh.document.getElementById("preloadViewport").checked, true);
+
+  const optedOut = loadOptionsPage({ preloadViewport: false });
+  optedOut.window.document.dispatchEvent(new optedOut.window.Event("DOMContentLoaded"));
+  await sleep(0);
+  assert.equal(optedOut.document.getElementById("preloadViewport").checked, false);
+});

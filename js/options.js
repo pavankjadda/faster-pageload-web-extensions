@@ -61,7 +61,7 @@ async function saveOptions(event) {
 async function restoreOptions() {
   try {
     const settings = await browser.storage.sync.get(["preloadViewport", "imgLazyLoad", "blacklistSites"]);
-    preloadViewportElement.checked = settings.preloadViewport === true;
+    preloadViewportElement.checked = settings.preloadViewport !== false;
     imgLazyLoadElement.checked = settings.imgLazyLoad === true;
     blacklistSitesElement.value = settings.blacklistSites || "";
   } catch (error) {

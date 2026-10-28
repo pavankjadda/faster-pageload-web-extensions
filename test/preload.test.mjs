@@ -107,8 +107,14 @@ test("viewport mode prefetches visible links, re-checks them and stops at the ca
   assert.ok(observers[0].disconnected);
 });
 
-test("viewport mode is off unless enabled", async () => {
+test("viewport mode is on by default", async () => {
   const { observed } = runContentScript("preload.js", { html: PAGE, storage: {} });
+  await sleep(50);
+  assert.equal(observed.length, 3);
+});
+
+test("viewport mode stays off when switched off", async () => {
+  const { observed } = runContentScript("preload.js", { html: PAGE, storage: { preloadViewport: false } });
   await sleep(50);
   assert.equal(observed.length, 0);
 });
