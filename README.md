@@ -21,7 +21,7 @@ Pages still load normally. The add-on just starts the download a little earlier,
 | Feature | Default | What it does |
 |---|---|---|
 | Preload on hover | On | Prefetches a link 65 ms after the pointer rests on it. Also prefetches on touch (mobile) and on mouse down. |
-| Preload every visible link | On | Also prefetches links as they scroll into view, up to 30 per page. |
+| Preload every visible link | On | Also prefetches links as they scroll into view, up to 30 per page. Uses stricter rules than hover (see [What is not preloaded](#what-is-not-preloaded)). |
 | Lazy-load images | Off | Marks images with `loading="lazy"` so off-screen images load only when you scroll near them. |
 | Site blacklist | Empty | Turns the add-on off completely on the listed sites. |
 | Toolbar switch | On | Clicking the rocket icon turns the add-on on or off everywhere. A grey rocket means it is off. |
@@ -101,11 +101,25 @@ The add-on sets `loading="lazy"` on images while the page is loading. Firefox of
 To avoid side effects and wasted downloads, the add-on skips these links:
 
 - **Links to other sites.** Firefox keeps a separate cache for each website you visit, so a page prefetched from site A is never reused when you open it on site B.
-- **Links that look like they change something on the server.** These are URLs containing `logout`, `log_out`, `sign-out`, `signoff`, `delete`, `destroy`, `remove`, `revoke`, `unsubscribe`, `unfollow`, `cancel` or `disconnect`. Prefetching a logout link would log you out.
+- **Links that look like they change something on the server.** Prefetching a logout link would log you out, and prefetching a vote link would cast the vote. These links are skipped if the URL contains any of:
+  - `logout`, `log_out`, `sign-out`, `signoff`
+  - `delete`, `destroy`, `remove`, `revoke`, `cancel`, `disconnect`
+  - `subscribe`, `unsubscribe`, `follow`, `unfollow`, `vote`, `like`, `unlike`
+  - `approve`, `confirm`, `accept`, `reject`, `archive`, `toggle`, `token`
+  - `mark-as-read` and similar
+  - `add-to-cart` and similar
+
+  This list is a heuristic, so some harmless links are skipped too. It can't catch every action link a site might have.
 - **Links to the current page,** including `#section` anchors.
 - **Download links** (`<a download>`), and links that are not `http`/`https` (`mailto:`, `javascript:`, …).
 - **Links the site marked with `data-no-instant`.** This is the same opt-out attribute that instant.page uses.
 - **An `http` link on an `https` page,** because it counts as a different origin.
+
+When **Preload every visible link** prefetches a link you didn't hover over, it also skips:
+
+- **Links with a query string** (`?…`). Most action links put their parameters there, so these wait for a hover.
+- **Links marked `rel="ugc"` or `rel="nofollow"`,** which sites use for links written by users.
+- **Links inside comment sections** (`#comments`, `.comments`, `.comment`, `[itemprop="comment"]`).
 
 ## Privacy
 

@@ -1,7 +1,7 @@
 "use strict";
 
-// Prefetches same-origin pages the user is about to open: on hover/touch by default, or every
-// link that scrolls into view when "Preload every visible link" is enabled.
+// Prefetches same-origin pages the user is about to open: on hover/touch, and links that scroll
+// into view while "Preload every visible link" is enabled (the default).
 // Approach based on instant.page by Alexandre Dieulot (https://instant.page/).
 (() => {
   const HOVER_DELAY_MS = 65;
@@ -10,8 +10,21 @@
   // Upper bound for viewport mode so link-heavy pages don't flood the server.
   const MAX_VIEWPORT_PRELOADS = 30;
   // GET links that commonly change state on the server must never be fetched speculatively.
-  const UNSAFE_LINK =
-    /(log|sign)[-_ ]?(out|off)|delete|destroy|remove|revoke|unsubscribe|unfollow|cancel|disconnect/i;
+  // False positives only cost a missed prefetch, so this errs on the side of skipping.
+  const UNSAFE_LINK = new RegExp(
+    [
+      "(log|sign)[-_ ]?(out|off)",
+      "delete|destroy|remove|revoke|cancel|disconnect",
+      "subscribe|\\bfollow\\b|unfollow|vote|\\blike\\b|unlike",
+      "approve|confirm|accept|reject|archive|toggle|token",
+      "mark[-_]?(as[-_]?)?(read|unread|seen|done)",
+      "add[-_]?to[-_]?(cart|basket|bag)",
+    ].join("|"),
+    "i"
+  );
+  // Links in comments and other user-generated content are written by third parties, not the
+  // site, so they are never preloaded without a hover.
+  const USER_CONTENT = '#comments, .comments, .comment, [itemprop~="comment"]';
 
   const prefetchSupported = document.createElement("link").relList?.supports?.("prefetch");
   if (!prefetchSupported || !document.body) return;
@@ -29,6 +42,14 @@
     // The current page itself, with or without a fragment.
     if (anchor.pathname + anchor.search === location.pathname + location.search) return false;
     return !UNSAFE_LINK.test(decodedPathAndQuery(anchor));
+  }
+
+  // Stricter rules for prefetches the user didn't ask for by hovering: no query strings (where
+  // most action links carry their parameters) and nothing from user-generated content.
+  function isViewportPreloadable(anchor) {
+    if (!isPreloadable(anchor) || anchor.search) return false;
+    if (anchor.relList.contains("ugc") || anchor.relList.contains("nofollow")) return false;
+    return !anchor.closest(USER_CONTENT);
   }
 
   function decodedPathAndQuery(anchor) {
@@ -110,11 +131,11 @@
         }
         observer.unobserve(entry.target);
         // Re-check: the page may have changed the link since it was observed.
-        if (isPreloadable(entry.target)) prefetch(entry.target.href);
+        if (isViewportPreloadable(entry.target)) prefetch(entry.target.href);
       }
     });
     for (const anchor of document.querySelectorAll("a[href]")) {
-      if (isPreloadable(anchor)) observer.observe(anchor);
+      if (isViewportPreloadable(anchor)) observer.observe(anchor);
     }
   }
 

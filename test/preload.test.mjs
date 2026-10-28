@@ -16,6 +16,12 @@ const PAGE = `<!doctype html><html><head></head><body>
   <a id="opt-out" href="/no" data-no-instant>opt out</a>
   <a id="mailto" href="mailto:help@example.test">mail</a>
   <a id="nested" href="/nested"><span id="inner">nested</span></a>
+  <a id="vote" href="/posts/9/vote?dir=up">upvote</a>
+  <a id="like" href="/posts/9/like">like</a>
+  <a id="mark-read" href="/notifications/mark-as-read">mark read</a>
+  <a id="add-to-cart" href="/cart/add_to_cart/42">buy</a>
+  <a id="ugc" href="/user/someone" rel="ugc">user link</a>
+  <section id="comments"><a id="in-comment" href="/spam-page">comment link</a></section>
 </body></html>`;
 
 function hover(window, element) {
@@ -46,7 +52,9 @@ test("hovering a child element of a link prefetches the link", async () => {
 
 test("unsafe, external and non-navigational links are never prefetched", async () => {
   const { window, document } = runContentScript("preload.js", { html: PAGE });
-  for (const id of ["external", "logout", "sign-out", "encoded", "delete", "hash", "self", "download", "opt-out", "mailto"]) {
+  const skipped = ["external", "logout", "sign-out", "encoded", "delete", "hash", "self", "download", "opt-out", "mailto"];
+  skipped.push("vote", "like", "mark-read", "add-to-cart");
+  for (const id of skipped) {
     hover(window, document.getElementById(id));
     await sleep(100);
   }
@@ -81,13 +89,22 @@ test("touchstart prefetches immediately and suppresses the synthetic mouseover",
   assert.deepEqual(prefetchedUrls(document), ["https://shop.example.test/cart"]);
 });
 
-test("viewport mode observes only preloadable links", async () => {
+test("viewport mode skips query strings and user-generated links", async () => {
   const { observed } = runContentScript("preload.js", { html: PAGE, storage: { preloadViewport: true } });
   await sleep(50);
   assert.deepEqual(
     observed.map((anchor) => anchor.id),
-    ["plain", "query", "nested"]
+    ["plain", "nested"]
   );
+});
+
+test("hovering still prefetches links that viewport mode skips", async () => {
+  const { window, document } = runContentScript("preload.js", { html: PAGE });
+  for (const id of ["query", "ugc", "in-comment"]) {
+    hover(window, document.getElementById(id));
+    await sleep(100);
+  }
+  assert.equal(prefetchedUrls(document).length, 3);
 });
 
 test("viewport mode prefetches visible links, re-checks them and stops at the cap", async () => {
@@ -99,18 +116,19 @@ test("viewport mode prefetches visible links, re-checks them and stops at the ca
   await sleep(50);
 
   observed[0].href = "/account/logout";
+  observed[1].href = "/p/1?ref=changed";
   observers[0].callback(observed.map((target) => ({ target, isIntersecting: true })));
 
   const urls = prefetchedUrls(document);
   assert.equal(urls.length, 30);
-  assert.ok(!urls.some((url) => url.includes("logout")));
+  assert.ok(!urls.some((url) => url.includes("logout") || url.includes("?")));
   assert.ok(observers[0].disconnected);
 });
 
 test("viewport mode is on by default", async () => {
   const { observed } = runContentScript("preload.js", { html: PAGE, storage: {} });
   await sleep(50);
-  assert.equal(observed.length, 3);
+  assert.equal(observed.length, 2);
 });
 
 test("viewport mode stays off when switched off", async () => {
