@@ -23,7 +23,7 @@
   },
   "browser_specific_settings": {
     "gecko": {
-      "id": "{73c0257e-a620-4c48-a2a8-2a9e8481a0d4}",
+      "id": "faster-pageload@pavankjadda.github.io",
       "strict_min_version": "91.0",
       "data_collection_permissions": {
         "required": ["none"]
